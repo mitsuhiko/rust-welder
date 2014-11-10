@@ -58,6 +58,10 @@ pub trait Error: 'static + Send {
 }
 
 pub trait ErrorExt<'a> {
+
+    /// Casts an abstract `&Error` into a concrete error.  This only
+    /// works if the error is of that actual type which is why this
+    /// returns an option.
     fn cast<E: Error>(self) -> Option<&'a E>;
 }
 
