@@ -1,0 +1,9 @@
+[package]
+name = "rust-welder"
+version = "0.1.0"
+authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
+
+[lib]
+name = "welder"
+path = "src/lib.rs"
+plugin = true
