@@ -3,34 +3,17 @@
 #[phase(plugin, link)]
 extern crate welder;
 
-use welder::{Error, ErrorExt, CommonErrorData, ErrorLocation, ConstructError};
+use std::io;
 
+use welder::{Error, ErrorExt, CommonErrorData, ErrorLocation, ConstructError,
+             FromError, print_error_stack};
 
-fn print_error(err: &Error, cause: &str) {
-    println!("{}:", cause);
-    println!("  {}: {}", err.name(), err.description());
-    match err.detail() {
-        Some(detail) => println!("    detail: {}", detail),
-        None => {},
-    }
-    match err.location() {
-        Some(location) => println!("    Error location: {}", location),
-        None => {},
-    }
-    match err.cause() {
-        Some(cause) => print_error(cause, "Error was caused by"),
-        None => {},
-    }
-}
-
-fn print_error_stack(err: &Error) {
-    print_error(err, "An unhandled error occurred");
-}
 
 #[deriving(Eq, PartialEq, Clone)]
 enum CliErrorKind {
     NotFound,
     NoPermission,
+    InternalIoError(io::IoError),
 }
 
 #[deriving(Clone)]
@@ -40,7 +23,7 @@ struct CliError {
 
 impl Error for CliError {
     fn name(&self) -> &str {
-        "CLI Error"
+        "CliError"
     }
 
     fn description(&self) -> &str {
@@ -53,6 +36,13 @@ impl Error for CliError {
 
     fn location(&self) -> Option<ErrorLocation> {
         self.data.location.clone()
+    }
+
+    fn cause(&self) -> Option<&Error> {
+        match self.data.kind {
+            InternalIoError(ref err) => Some(err as &Error),
+            _ => None,
+        }
     }
 }
 
@@ -70,6 +60,19 @@ impl ConstructError<(CliErrorKind, &'static str)> for CliError {
     }
 }
 
+impl FromError<io::IoError> for CliError {
+    fn from_error(err: io::IoError, loc: Option<ErrorLocation>) -> CliError {
+        CliError {
+            data: box CommonErrorData {
+                description: "an I/O error occurred",
+                kind: InternalIoError(err),
+                detail: None,
+                location: loc,
+            }
+        }
+    }
+}
+
 fn test_missing_item() -> Result<(), CliError> {
     fail!(NotFound, "The intended item does not exist.");
 }
@@ -77,6 +80,17 @@ fn test_missing_item() -> Result<(), CliError> {
 fn bar() -> Result<(), CliError> {
     try!(test_missing_item());
     fail!(NoPermission, "Access not possible");
+}
+
+fn read_first_line() -> Result<String, io::IoError> {
+    let file = try!(io::File::open(&Path::new("/missing.txt")));
+    let mut br = io::BufferedReader::new(file);
+    br.read_line()
+}
+
+fn an_io_error() -> Result<(), CliError> {
+    try!(read_first_line());
+    Ok(())
 }
 
 
@@ -89,6 +103,11 @@ fn main() {
             }
             print_error_stack(&e);
         },
+        Ok(_) => {},
+    }
+
+    match an_io_error() {
+        Err(e) => print_error_stack(&e),
         Ok(_) => {},
     }
 }
