@@ -40,7 +40,7 @@ impl Error for CliError {
 
     fn cause(&self) -> Option<&Error> {
         match self.data.kind {
-            InternalIoError(ref err) => Some(err as &Error),
+            CliErrorKind::InternalIoError(ref err) => Some(err as &Error),
             _ => None,
         }
     }
@@ -65,7 +65,7 @@ impl FromError<io::IoError> for CliError {
         CliError {
             data: box CommonErrorData {
                 description: "an I/O error occurred",
-                kind: InternalIoError(err),
+                kind: CliErrorKind::InternalIoError(err),
                 detail: None,
                 location: loc,
             }
@@ -74,12 +74,12 @@ impl FromError<io::IoError> for CliError {
 }
 
 fn test_missing_item() -> Result<(), CliError> {
-    fail!(NotFound, "The intended item does not exist.");
+    fail!(CliErrorKind::NotFound, "The intended item does not exist.");
 }
 
 fn bar() -> Result<(), CliError> {
     try!(test_missing_item());
-    fail!(NoPermission, "Access not possible");
+    fail!(CliErrorKind::NoPermission, "Access not possible");
 }
 
 fn read_first_line() -> Result<String, io::IoError> {
